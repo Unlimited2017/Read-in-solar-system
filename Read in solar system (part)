@@ -1,0 +1,175 @@
+# Read-in-solar-system
+
+import java.util.Scanner;
+import java.lang.Math;
+import java.util.Arrays;
+import java.io.*;
+public class SolarSim{
+
+    private static final double earthMass = 5.9726*Math.pow(10,24);
+    private static final double earthRadius = 6371000;
+    private static final double sunMass = 1.9885*Math.pow(10,30);
+    private static final double sunRadius = 696342000;
+    private static final double mercuryMass = 3.301*Math.pow(10,23);
+    private static final double mercuryRadius = 2.44*Math.pow(10,6);
+    private static final PhysicsVector zero = new PhysicsVector(0,0);
+    private static final PhysicsVector zero1 = new PhysicsVector(0,0);
+    private static final PhysicsVector zero2 = new PhysicsVector(0,0);
+    private static final PhysicsVector zeroa = new PhysicsVector(0,0);
+    private static final PhysicsVector zerob = new PhysicsVector(0,0);
+    private static final PhysicsVector zeroc = new PhysicsVector(0,0);
+
+    public static PhysicsVector[] copyArray(PhysicsVector[] a) {
+        int length = a.length;
+        PhysicsVector[] copy = new PhysicsVector[length];
+        System.arraycopy(a, 0, copy, 0, length);
+        return copy;
+    }
+
+    public static double sumArray(double[] p){
+        double sum = 0;
+        for(int z= 0; z < p.length; z++){
+            sum += p[z];
+        }
+        return sum;
+    }
+
+    public static PhysicsVector[] add(PhysicsVector[] sum, PhysicsVector a){
+        for(int c = 0; c<sum.length; c++){
+            sum[c].increaseBy(a);
+        }
+        return sum;
+    }
+
+    public static PhysicsVector[] subtract(PhysicsVector[] diff, PhysicsVector g){
+        for (int ab=0; ab<diff.length;ab++){ 
+            diff[ab].decreaseBy(g);
+        }
+        return diff;
+    }   
+    public static void main(String[] args) throws IOException{
+
+        java.io.File file = new java.io.File("output.txt" );
+        java.io.PrintWriter n = new PrintWriter(file);
+
+        //Initialise variables here
+        PhysicsVector earthInitialPos = new PhysicsVector();
+        PhysicsVector earthInitialV = new PhysicsVector();
+        PhysicsVector sunInitialV = new PhysicsVector();
+        PhysicsVector sunInitialPos = new PhysicsVector();
+        PhysicsVector mercuryInitialPos = new PhysicsVector();
+        PhysicsVector mercuryInitialV=new PhysicsVector();
+
+        Scanner scanner = new Scanner(System.in);       
+        System.out.println("Please enter the size of the time step:");
+        double timeStep = scanner.nextDouble();
+
+        //SET PLANETS' INITIAL POSITIONS
+        earthInitialPos.setVector(1.4960*Math.pow(10,11),0);
+        earthInitialV.setVector(0,29786.24);
+
+        sunInitialPos.setVector(0,0);
+        sunInitialV.setVector(0,0);
+
+        mercuryInitialPos.setVector(5.791*Math.pow(10,10),0);
+        mercuryInitialV.setVector(0,47873.5);
+
+        //CREATE GRAVFIELD OBJECTS
+        GravField sunGravField = new GravField(sunMass, sunRadius, sunInitialPos);
+        GravField earthGravField = new GravField(earthMass, earthRadius, earthInitialPos);
+        GravField mercuryGravField = new GravField(mercuryMass, mercuryRadius, mercuryInitialPos);
+
+        //CREATE PARTICLE OBJECTS   
+        Particle earth = new Particle(earthMass, earthInitialPos, earthInitialV);
+        Particle sun = new Particle(sunMass, sunInitialPos, sunInitialV); 
+        Particle mercury = new Particle(mercuryMass, mercuryInitialPos, mercuryInitialV);
+
+        double time = 0;
+        double finalTime = 31557600;            //One earth year(seconds)
+
+        PhysicsVector newSunGrav = new PhysicsVector();
+        PhysicsVector newEarthGrav = new PhysicsVector();
+        PhysicsVector newMoonGrav = new PhysicsVector();
+
+        GravField[] gravityObject = {earthGravField, sunGravField, mercuryGravField};
+        PhysicsVector[] position = {earthInitialPos, sunInitialPos, mercuryInitialPos}; 
+        PhysicsVector[] velocity = {earthInitialV, sunInitialV, mercuryInitialV};
+        PhysicsVector[] gravField = {zero, zero1, zero2};
+        double[] planetMass = {earthMass, sunMass, mercuryMass};
+        Particle[] planets = {earth, sun, mercury};
+
+        //Calculate the centre of mass and subtract position from positions of planets, so c.o.m is at origin
+        PhysicsVector centreOfMass = new PhysicsVector();
+        centreOfMass = sun.centreOfMass(planetMass, position);
+        position = SolarSim.subtract(position, centreOfMass);
+        System.out.println(Arrays.toString(position));
+        centreOfMass.print();
+
+        //Calculate centre of mass velocity and subtract from planet velocities
+        PhysicsVector centreOfMassVelocity = new PhysicsVector();
+        centreOfMassVelocity = sun.cOMVel(planetMass, velocity);
+        centreOfMassVelocity.print();
+        velocity = SolarSim.subtract(velocity, centreOfMassVelocity);
+
+        //Calculate fields of planets
+        for(int ac=0; ac<gravityObject.length; ac++){
+            for(int ad=0;ad<gravityObject.length;ad++){
+                if(ac!=ad){
+                    gravField[ac].increaseBy(gravityObject[ac].aDueToGravity(planetMass[ad], position[ad], position[ac]));
+                }
+                else{
+                    //do nothing
+                }
+            }
+        }
+        PhysicsVector[] newP = new PhysicsVector[position.length];
+        PhysicsVector[] newGrav = {zeroa,zerob,zeroc};
+        PhysicsVector[] newVel = new PhysicsVector[velocity.length];
+
+        do{
+            PhysicsVector[] y = new PhysicsVector[gravField.length];
+            y=copyArray(gravField);
+
+            for(int i=0; i<planets.length;i++){
+                newP[i] = planets[i].updatePosition(position[i], velocity[i], timeStep, gravField[i]);
+            }
+
+            for(int j=0; j<gravityObject.length; j++){    
+                for(int l=0;l<gravityObject.length;l++){
+                    if(j!=l){
+                        newGrav[j].increaseBy(gravityObject[j].aDueToGravity(planetMass[l], newP[l], newP[j]));
+                    }
+                    else{
+                        //do nothing
+                    }
+                }
+            }
+
+            for(int k=0; k<planets.length; k++){
+                newVel[k] = planets[k].updateVelocity(velocity[k], timeStep, y[k], newGrav[k]);
+            }
+
+            //Calculate centre of mass velocity and subtract from planet velocities
+            centreOfMassVelocity = earth.cOMVel(planetMass, newVel);
+            for (int ab=0; ab<newVel.length;ab++){ 
+                newVel[ab].decreaseBy(centreOfMassVelocity);    
+            }
+            newVel = SolarSim.subtract(newVel, centreOfMassVelocity);
+
+            gravField = copyArray(newGrav);
+            velocity = newVel;
+            position = newP;
+
+            time+=timeStep;
+            double x = newP[0].getX();
+            double ap = newP[0].getY();
+            n.println(x+"   "+ap);
+
+        }while (time<=1000*finalTime);
+        System.out.println(Arrays.toString(newP));
+
+
+        n.close();
+    }
+
+}
